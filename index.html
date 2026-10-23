@@ -91,13 +91,8 @@
                 </div>
 
                 <!-- Progress / Capacity Gauge Bar -->
-                <div class="w-full bg-slate-800 rounded-full h-2.5 my-4 overflow-hidden">
+                <div class="w-full bg-slate-800 rounded-full h-2.5 my-2 overflow-hidden">
                     <div id="barFase1" class="bg-amber-500 h-2.5 rounded-full transition-all duration-300" style="width: 0%"></div>
-                </div>
-
-                <div class="pt-4 border-t border-slate-800/80 flex items-center justify-between text-xs text-slate-400">
-                    <span>Pico Máximo:</span>
-                    <span class="font-bold text-slate-200"><span id="picoFase1">0.00</span> A</span>
                 </div>
             </div>
 
@@ -120,13 +115,8 @@
                 </div>
 
                 <!-- Progress / Capacity Gauge Bar -->
-                <div class="w-full bg-slate-800 rounded-full h-2.5 my-4 overflow-hidden">
+                <div class="w-full bg-slate-800 rounded-full h-2.5 my-2 overflow-hidden">
                     <div id="barFase2" class="bg-emerald-500 h-2.5 rounded-full transition-all duration-300" style="width: 0%"></div>
-                </div>
-
-                <div class="pt-4 border-t border-slate-800/80 flex items-center justify-between text-xs text-slate-400">
-                    <span>Pico Máximo:</span>
-                    <span class="font-bold text-slate-200"><span id="picoFase2">0.00</span> A</span>
                 </div>
             </div>
 
@@ -149,13 +139,8 @@
                 </div>
 
                 <!-- Progress / Capacity Gauge Bar -->
-                <div class="w-full bg-slate-800 rounded-full h-2.5 my-4 overflow-hidden">
+                <div class="w-full bg-slate-800 rounded-full h-2.5 my-2 overflow-hidden">
                     <div id="barFase3" class="bg-rose-500 h-2.5 rounded-full transition-all duration-300" style="width: 0%"></div>
-                </div>
-
-                <div class="pt-4 border-t border-slate-800/80 flex items-center justify-between text-xs text-slate-400">
-                    <span>Pico Máximo:</span>
-                    <span class="font-bold text-slate-200"><span id="picoFase3">0.00</span> A</span>
                 </div>
             </div>
 
@@ -208,6 +193,9 @@
         let esp32Ip = localStorage.getItem('esp32_ip') || '10.108.139.127';
 
         const ESCALA_MAX = 5.0;
+
+        // Limiar de corte para ruído de motor desligado (qualquer valor abaixo de 0.60 A vira 0.00 A total)
+        const PISO_RUIDO_FRONTEND = 0.60;
 
         // Configuração do Gráfico Chart.js
         const ctx = document.getElementById('currentChart').getContext('2d');
@@ -267,27 +255,27 @@
         });
 
         // Função de Atualização da UI
-        function updateUI(f1, f2, f3, p1, p2, p3, tempo) {
-            const numF1 = parseFloat(f1) || 0;
-            const numF2 = parseFloat(f2) || 0;
-            const numF3 = parseFloat(f3) || 0;
+        function updateUI(f1, f2, f3) {
+            let numF1 = parseFloat(f1) || 0;
+            let numF2 = parseFloat(f2) || 0;
+            let numF3 = parseFloat(f3) || 0;
+
+            // Filtro de corte de ruído (motor desligado = zero total)
+            if (numF1 < PISO_RUIDO_FRONTEND) numF1 = 0.0;
+            if (numF2 < PISO_RUIDO_FRONTEND) numF2 = 0.0;
+            if (numF3 < PISO_RUIDO_FRONTEND) numF3 = 0.0;
 
             // 1. Atualizar Textos das Correntes
             document.getElementById('valFase1').innerText = numF1.toFixed(2);
             document.getElementById('valFase2').innerText = numF2.toFixed(2);
             document.getElementById('valFase3').innerText = numF3.toFixed(2);
 
-            // 2. Atualizar Picos
-            document.getElementById('picoFase1').innerText = (parseFloat(p1) || numF1).toFixed(2);
-            document.getElementById('picoFase2').innerText = (parseFloat(p2) || numF2).toFixed(2);
-            document.getElementById('picoFase3').innerText = (parseFloat(p3) || numF3).toFixed(2);
-
-            // 3. Porcentagem das Barras de Progresso
+            // 2. Porcentagem das Barras de Progresso
             document.getElementById('barFase1').style.width = Math.min((numF1 / ESCALA_MAX) * 100, 100) + '%';
             document.getElementById('barFase2').style.width = Math.min((numF2 / ESCALA_MAX) * 100, 100) + '%';
             document.getElementById('barFase3').style.width = Math.min((numF3 / ESCALA_MAX) * 100, 100) + '%';
 
-            // 4. Atualizar Gráfico Dinâmico
+            // 3. Atualizar Gráfico Dinâmico
             const agora = new Date().toLocaleTimeString();
             chart.data.labels.push(agora);
             chart.data.datasets[0].data.push(numF1);
@@ -330,11 +318,7 @@
                     updateUI(
                         data.fase1 || 0,
                         data.fase2 || 0,
-                        data.fase3 || 0,
-                        data.picoFase1 || 0,
-                        data.picoFase2 || 0,
-                        data.picoFase3 || 0,
-                        data.tempoFormatado || "00:00:00"
+                        data.fase3 || 0
                     );
                 } else {
                     updateStatus(false, "Firebase Sem Dados");
@@ -367,11 +351,7 @@
                     updateUI(
                         data.fase1 || 0,
                         data.fase2 || 0,
-                        data.fase3 || 0,
-                        data.picoFase1 || 0,
-                        data.picoFase2 || 0,
-                        data.picoFase3 || 0,
-                        data.tempoFormatado || "00:00:00"
+                        data.fase3 || 0
                     );
                 } catch (err) {
                     updateStatus(false, "Erro de Conexão IP Local");
